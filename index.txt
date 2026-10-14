@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siêu Nhí Luyện Phím</title>
+    <!-- Tích hợp Tone.js để tạo âm thanh tương tác -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+
+        body {
+            font-family: 'Comic Neue', cursive;
+            background-color: #e0f7fa;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            border: 4px solid #4dd0e1;
+        }
+        h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+        .hidden { display: none !important; }
+        
+        /* Màn hình Đăng nhập */
+        #login-screen input {
+            font-family: inherit;
+            font-size: 1.5em;
+            padding: 10px;
+            border: 3px solid #ffca28;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            width: 80%;
+        }
+        .btn {
+            background: #ff5252;
+            color: white;
+            font-size: 1.5em;
+            font-family: inherit;
+            padding: 10px 30px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #c62828;
+            transition: all 0.1s;
+        }
+        .btn:active { transform: translateY(5px); box-shadow: none; }
+
+        /* Màn hình Trò chơi */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.3em;
+            background: #fff9c4;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .coins { color: #f57f17; }
+        .timer { color: #d32f2f; }
+        
+        #target-word {
+            font-size: 4em;
+            color: #1976d2;
+            letter-spacing: 2px;
+            margin: 20px 0;
+            user-select: none;
+        }
+        #type-input {
+            font-family: inherit;
+            font-size: 2em;
+            padding: 15px;
+            border: 4px solid #81c784;
+            border-radius: 15px;
+            text-align: center;
+            width: 80%;
+            outline: none;
+        }
+        #type-input:focus { border-color: #388e3c; }
+
+        /* Màn hình Chúc mừng */
+        #celebration-screen h2 { color: #ff9800; font-size: 2em; }
+        .coin-reward {
+            font-size: 4em;
+            margin: 20px 0;
+            animation: bounce 1s infinite alternate;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-20px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- MÀN HÌNH NHẬP TÊN -->
+        <div id="login-screen">
+            <h1>🎮 Siêu Nhí Luyện Phím</h1>
+            <p style="font-size: 1.2em;">Bé hãy nhập tên để bắt đầu nhé!</p>
+            <input type="text" id="player-name" placeholder="Tên của bé là..." autocomplete="off">
+            <br>
+            <button class="btn" onclick="startGame()">Bắt Đầu Chơi!</button>
+        </div>
+
+        <!-- MÀN HÌNH TRÒ CHƠI -->
+        <div id="game-screen" class="hidden">
+            <div class="stats">
+                <span id="display-name">👤 Khách</span>
+                <span class="coins">🪙 Đồng xu: <span id="coin-count">0</span></span>
+                <span class="timer">⏳ Thời gian: <span id="time-left">60</span>s</span>
+            </div>
+            <h3 style="color: #673ab7; margin: 0;">Cấp độ: <span id="level-display">1</span>/3</h3>
+            <div id="target-word">A S D F</div>
+            <input type="text" id="type-input" placeholder="Gõ chữ ở trên vào đây..." autocomplete="off">
+        </div>
+
+        <!-- MÀN HÌNH CHÚC MỪNG CHUYỂN CẤP -->
+        <div id="celebration-screen" class="hidden">
+            <h2>🎉 Chúc mừng <span id="winner-name"></span>! 🎉</h2>
+            <p style="font-size: 1.5em;" id="celebration-message">Bé đã hoàn thành xuất sắc!</p>
+            <div class="coin-reward">🪙 +10</div>
+            <button class="btn" id="next-level-btn" onclick="nextLevel()">Sang Cấp Tiếp Theo</button>
+        </div>
+    </div>
+
+    <script>
+        // Các thiết lập của trò chơi
+        let playerName = "";
+        let currentLevel = 1;
+        let coins = 0;
+        let timeLeft = 60;
+        let timerInterval;
+        let currentWordIndex = 0;
+
+        // Bộ từ vựng theo cấp độ cho học sinh lớp 3
+        const levels = {
+            1: ["a", "s", "d", "f", "j", "k", "l", "h", "g", "q", "w", "e", "r"], // Làm quen phím
+            2: ["ca", "meo", "cho", "hoc", "tap", "ban", "ghe", "sach", "vo", "truong"], // Từ không dấu cơ bản
+            3: ["cá voi", "con mèo", "học sinh", "lớp ba", "trường học", "bạn bè", "chăm ngoan"] // Cụm từ
+        };
+        let currentWords = [];
+
+        // Hệ thống âm thanh (Sử dụng Tone.js)
+        const synth = new Tone.Synth().toDestination(); // Âm thanh gõ phím
+        const polySynth = new Tone.PolySynth().toDestination(); // Âm thanh chúc mừng
+
+        function playKeySound() {
+            synth.triggerAttackRelease("C5", "32n"); // Tiếng "tíc" nhẹ
+        }
+
+        function playCorrectSound() {
+            synth.triggerAttackRelease("E5", "8n"); // Tiếng "ting" cao hơn
+        }
+
+        function playWinSound() {
+            const now = Tone.now();
+            polySynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n", now); // Hợp âm chiến thắng
+        }
+
+        // Bắt đầu trò chơi
+        async function startGame() {
+            // Yêu cầu khởi động Audio Context cho trình duyệt
+            await Tone.start();
+            
+            const nameInput = document.getElementById("player-name").value;
+            if (!nameInput) {
+                alert("Bé nhớ nhập tên nhé!");
+                return;
+            }
+            
+            playerName = nameInput;
+            document.getElementById("display-name").innerText = "👤 " + playerName;
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("game-screen").classList.remove("hidden");
+            
+            loadLevel(1);
+        }
+
+        // Tải dữ liệu cấp độ
+        function loadLevel(level) {
+            currentLevel = level;
+            document.getElementById("level-display").innerText = currentLevel;
+            currentWords = [...levels[currentLevel]];
+            // Trộn ngẫu nhiên từ
+            currentWords.sort(() => Math.random() - 0.5); 
+            currentWordIndex = 0;
+            
+            timeLeft = 60;
+            document.getElementById("time-left").innerText = timeLeft;
+            
+            showNextWord();
+            document.getElementById("type-input").value = "";
+            document.getElementById("type-input").focus();
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        // Hiển thị từ tiếp theo
+        function showNextWord() {
+            if (currentWordIndex >= currentWords.length) {
+                levelComplete();
+                return;
+            }
+            document.getElementById("target-word").innerText = currentWords[currentWordIndex];
+        }
+
+        // Cập nhật đồng hồ đếm ngược
+        function updateTimer() {
+            timeLeft--;
+            document.getElementById("time-left").innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert("Hết giờ rồi! Hãy thử lại nhé.");
+                loadLevel(currentLevel); // Chơi lại cấp độ hiện tại
+            }
+        }
+
+        // Xử lý sự kiện gõ phím
+        const inputField = document.getElementById("type-input");
+        inputField.addEventListener("input", function(e) {
+            playKeySound(); // Phát âm thanh mỗi khi gõ
+            
+            const currentWord = currentWords[currentWordIndex];
+            const typedWord = inputField.value;
+
+            if (typedWord === currentWord) {
+                playCorrectSound();
+                coins += 2; // Cộng 2 xu cho mỗi từ đúng
+                document.getElementById("coin-count").innerText = coins;
+                currentWordIndex++;
+                inputField.value = "";
+                showNextWord();
+            }
+        });
+
+        // Hoàn thành cấp độ
+        function levelComplete() {
+            clearInterval(timerInterval);
+            playWinSound(); // Phát nhạc chúc mừng
+            coins += 10; // Thưởng 10 xu qua màn
+            document.getElementById("coin-count").innerText = coins;
+            
+            document.getElementById("game-screen").classList.add("hidden");
+            document.getElementById("celebration-screen").classList.remove("hidden");
+            document.getElementById("winner-name").innerText = playerName;
+            
+            if (currentLevel >= 3) {
+                document.getElementById("celebration-message").innerText = "Bé đã phá đảo toàn bộ trò chơi! Xuất sắc!";
+                document.getElementById("next-level-btn").innerText = "Chơi lại từ đầu";
+            } else {
+                document.getElementById("celebration-message").innerText = `Bé đã vượt qua Cấp ${currentLevel}! Tặng bé 10 đồng xu.`;
+                document.getElementById("next-level-btn").innerText = "Sang Cấp Tiếp Theo";
+            }
+        }
+
+        // Chuyển cấp
+        function nextLevel() {
+            document.getElementById("celebration-screen").classList.add("hidden");
+            document.getElementById("game-screen").classList.remove("hidden");
+            
+            if (currentLevel >= 3) {
+                coins = 0;
+                document.getElementById("coin-count").innerText = coins;
+                loadLevel(1);
+            } else {
+                loadLevel(currentLevel + 1);
+            }
+        }
+    </script>
+</body>
+</html>
